@@ -8,11 +8,21 @@ datasource db {
 }
 
 model User {
-  clerkUserId String   @id @map("clerk_user_id")
-  email       String   @unique
-  createdAt   DateTime @default(now()) @map("created_at")
-  apiKeys     ApiKey[]
-
+  clerkUserId  String   @id @map("clerk_user_id")
+  email        String   @unique
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  
+  // GitHub OAuth
+  githubId          Int?    @unique @map("github_id")
+  githubUsername    String? @map("github_username")
+  githubAccessToken String? @map("github_access_token")
+  
+  apiKeys      ApiKey[]
+  repositories Repository[]
+  
+  @@index([email])
+  @@index([githubId])
   @@map("users")
 }
 
@@ -22,6 +32,47 @@ model ApiKey {
   name      String
   createdAt DateTime @default(now()) @map("created_at")
   user      User     @relation(fields: [userId], references: [clerkUserId])
-
+  
   @@map("api_keys")
+}
+
+model Repository {
+  id            String   @id @default(uuid())
+  userId        String   @map("user_id")
+  
+  // GitHub metadata
+  githubId      Int      @unique @map("github_id")
+  githubUrl     String   @map("github_url")
+  fullName      String   @map("full_name")
+  defaultBranch String   @default("main") @map("default_branch")
+  isPrivate     Boolean  @default(false) @map("is_private")
+  
+  // Webhook
+  webhookId     Int?     @map("webhook_id")
+  webhookSecret String?  @map("webhook_secret")
+  
+  // User-facing
+  displayName   String?  @map("display_name")
+  description   String?
+  
+  // Indexing status
+  status        String   @default("PENDING")
+  indexedAt     DateTime? @map("indexed_at")
+  lastSyncedAt  DateTime? @map("last_synced_at")
+  lastCommitSha String?  @map("last_commit_sha")
+  errorMessage  String?  @map("error_message")
+  
+  // Stats
+  fileCount     Int      @default(0) @map("file_count")
+  totalSize     Int      @default(0) @map("total_size")
+  
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  
+  user          User     @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  
+  @@unique([userId, githubId])
+  @@index([userId, status])
+  @@index([webhookId])
+  @@map("repositories")
 }
