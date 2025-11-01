@@ -1,0 +1,27 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  clerkUserId String   @id @map("clerk_user_id")
+  email       String   @unique
+  createdAt   DateTime @default(now()) @map("created_at")
+  apiKeys     ApiKey[]
+
+  @@map("users")
+}
+
+model ApiKey {
+  key       String   @id
+  userId    String   @map("user_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [clerkUserId])
+
+  @@map("api_keys")
+}

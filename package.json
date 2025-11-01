@@ -1,0 +1,25 @@
+{
+  "name": "monomind-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anirame128/monomind-backend.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/anirame128/monomind-backend/issues"
+  },
+  "homepage": "https://github.com/anirame128/monomind-backend#readme",
+  "dependencies": {
+    "@prisma/client": "^6.18.0",
+    "prisma": "^6.18.0"
+  }
+}
