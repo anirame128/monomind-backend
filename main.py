@@ -82,6 +82,9 @@ async def github_oauth_start(user_id: str):
     """
     Initiate GitHub OAuth flow.
     Frontend calls this with Clerk user ID in query param.
+    
+    Uses prompt=select_account to force GitHub to show account picker,
+    allowing users to choose which GitHub account to link.
     """
     state = user_id  # In production, encrypt this
     
@@ -91,6 +94,7 @@ async def github_oauth_start(user_id: str):
         f"&redirect_uri={REDIRECT_URL}"
         f"&scope=repo,write:repo_hook"
         f"&state={state}"
+        f"&prompt=select_account"
     )
     
     return RedirectResponse(github_auth_url)
@@ -130,16 +134,42 @@ async def github_oauth_callback(code: str, state: str):
                 }
             )
             
-            github_user = user_response.json()
+            if user_response.status_code != 200:
+                print(f"Failed to fetch GitHub user info: {user_response.status_code}")
+                return RedirectResponse(f"{FRONTEND_URL}/dashboard?error=auth_failed")
             
-            # Update user in database
+            github_user = user_response.json()
+            github_user_id = github_user["id"]
             clerk_user_id = state
-            await db.user.update(
+            
+            # Check if this GitHub account is already linked to a different Clerk user
+            existing_user_with_github = await db.user.find_unique(
+                where={"githubId": github_user_id}
+            )
+            
+            # If GitHub account is linked to another user, reject the connection
+            if existing_user_with_github and existing_user_with_github.clerkUserId != clerk_user_id:
+                print(f"GitHub account {github_user_id} ({github_user['login']}) is already linked to user {existing_user_with_github.clerkUserId}")
+                return RedirectResponse(
+                    f"{FRONTEND_URL}/dashboard?error=github_already_linked&message=This GitHub account is already connected to another account. Please log out of GitHub or use a different GitHub account."
+                )
+            
+            # Update user in database (will create if doesn't exist)
+            await db.user.upsert(
                 where={"clerkUserId": clerk_user_id},
                 data={
-                    "githubId": github_user["id"],
-                    "githubUsername": github_user["login"],
-                    "githubAccessToken": access_token
+                    "create": {
+                        "clerkUserId": clerk_user_id,
+                        "email": f"{clerk_user_id}@temp.monomind",  # Temporary, webhook will update
+                        "githubId": github_user_id,
+                        "githubUsername": github_user["login"],
+                        "githubAccessToken": access_token
+                    },
+                    "update": {
+                        "githubId": github_user_id,
+                        "githubUsername": github_user["login"],
+                        "githubAccessToken": access_token
+                    }
                 }
             )
         
