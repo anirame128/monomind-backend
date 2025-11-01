@@ -11,7 +11,7 @@ model User {
   clerkUserId  String   @id @map("clerk_user_id")
   email        String   @unique
   createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
   
   // GitHub OAuth
   githubId          Int?    @unique @map("github_id")
@@ -67,7 +67,7 @@ model Repository {
   totalSize     Int      @default(0) @map("total_size")
   
   createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   
   user          User     @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
   
