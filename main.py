@@ -12,7 +12,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://*.vercel.app",  # Allow all Vercel deployments
+        "https://*.vercel.app",
+        "https://monomind-frontend-gli94a20t-anirame128s-projects.vercel.app",
+        "https://monomind-frontend.vercel.app",  # Add your production domain
     ],
     allow_credentials=True,
     allow_methods=["*"],
