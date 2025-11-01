@@ -1,9 +1,23 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
+from fastapi.middleware.cors import CORSMiddleware
 from prisma import Prisma
 import secrets
+import os
 
 app = FastAPI()
 db = Prisma()
+
+# Update CORS for production
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://*.vercel.app",  # Allow all Vercel deployments
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup():
@@ -30,7 +44,10 @@ async def clerk_webhook(data: dict):
     return {"status": "ok"}
 
 @app.post("/api-keys/generate")
-async def generate_api_key(clerk_user_id: str, name: str):
+async def generate_api_key(payload: dict = Body(...)):
+    clerk_user_id = payload.get("clerk_user_id")
+    name = payload.get("name")
+    
     key = f"mk_live_{secrets.token_urlsafe(32)}"
     await db.apikey.create(
         data={"key": key, "userId": clerk_user_id, "name": name}
@@ -41,3 +58,12 @@ async def generate_api_key(clerk_user_id: str, name: str):
 async def list_api_keys(clerk_user_id: str):
     keys = await db.apikey.find_many(where={"userId": clerk_user_id})
     return keys
+
+@app.delete("/api-keys/{key}")
+async def delete_api_key(key: str):
+    await db.apikey.delete(where={"key": key})
+    return {"status": "deleted"}
+
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "Monomind API"}
