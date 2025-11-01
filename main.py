@@ -203,8 +203,7 @@ async def list_github_repos(clerk_user_id: str):
         
         # Check which are already indexed
         indexed_repos = await db.repository.find_many(
-            where={"userId": user.clerkUserId},
-            select={"githubId": True}
+            where={"userId": user.clerkUserId}
         )
         indexed_ids = {r.githubId for r in indexed_repos}
         
