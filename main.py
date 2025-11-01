@@ -151,6 +151,22 @@ async def github_oauth_callback(code: str, state: str):
         return RedirectResponse(f"{FRONTEND_URL}/dashboard?error=auth_failed")
 
 
+@app.get("/user/{clerk_user_id}/github-status")
+async def get_github_status(clerk_user_id: str):
+    """Check if user has GitHub connected."""
+    user = await db.user.find_unique(
+        where={"clerkUserId": clerk_user_id}
+    )
+    
+    if not user:
+        return {"connected": False}
+    
+    return {
+        "connected": user.githubId is not None,
+        "username": user.githubUsername
+    }
+
+
 @app.get("/")
 async def root():
     return {"status": "ok", "message": "Monomind API"}
