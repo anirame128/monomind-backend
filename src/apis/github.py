@@ -1,83 +1,12 @@
-from fastapi import FastAPI, Body, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import APIRouter, HTTPException, Body
 from fastapi.responses import RedirectResponse
-from prisma import Prisma
-import secrets
-import os
 import httpx
+from ..config import db, GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, FRONTEND_URL, REDIRECT_URL
 
-app = FastAPI()
-db = Prisma()
+router = APIRouter()
 
-# Environment variables
-GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
-GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-FRONTEND_URL = os.getenv("FRONTEND_URL")
-REDIRECT_URL = os.getenv("REDIRECT_URL")
 
-# Update CORS for production
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "https://*.vercel.app",
-        "https://monomind-frontend-gli94a20t-anirame128s-projects.vercel.app",
-        "https://monomind-frontend.vercel.app",  # Add your production domain
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.on_event("startup")
-async def startup():
-    await db.connect()
-
-@app.on_event("shutdown")
-async def shutdown():
-    await db.disconnect()
-
-@app.post("/webhooks/clerk")
-async def clerk_webhook(data: dict):
-    if data.get("type") == "user.created":
-        user_data = data["data"]
-        await db.user.upsert(
-            where={"clerkUserId": user_data["id"]},
-            data={
-                "create": {
-                    "clerkUserId": user_data["id"],
-                    "email": user_data["email_addresses"][0]["email_address"]
-                },
-                "update": {}
-            }
-        )
-    return {"status": "ok"}
-
-@app.post("/api-keys/generate")
-async def generate_api_key(payload: dict = Body(...)):
-    clerk_user_id = payload.get("clerk_user_id")
-    name = payload.get("name")
-    key = f"mk_live_{secrets.token_urlsafe(32)}"
-    await db.apikey.create(
-        data={"key": key, "userId": clerk_user_id, "name": name}
-    )
-    return {"api_key": key}
-
-@app.get("/api-keys/{clerk_user_id}")
-async def list_api_keys(clerk_user_id: str):
-    keys = await db.apikey.find_many(where={"userId": clerk_user_id})
-    return keys
-
-@app.delete("/api-keys/{key}")
-async def delete_api_key(key: str):
-    await db.apikey.delete(where={"key": key})
-    return {"status": "deleted"}
-
-# ============================================
-# GITHUB OAUTH ENDPOINTS
-# ============================================
-
-@app.get("/auth/github")
+@router.get("/auth/github")
 async def github_oauth_start(user_id: str):
     """
     Initiate GitHub OAuth flow.
@@ -100,7 +29,7 @@ async def github_oauth_start(user_id: str):
     return RedirectResponse(github_auth_url)
 
 
-@app.get("/auth/github/callback")
+@router.get("/auth/github/callback")
 async def github_oauth_callback(code: str, state: str):
     """
     GitHub redirects here after user authorizes.
@@ -181,7 +110,7 @@ async def github_oauth_callback(code: str, state: str):
         return RedirectResponse(f"{FRONTEND_URL}/dashboard?error=auth_failed")
 
 
-@app.get("/user/{clerk_user_id}/github-status")
+@router.get("/user/{clerk_user_id}/github-status")
 async def get_github_status(clerk_user_id: str):
     """Check if user has GitHub connected."""
     user = await db.user.find_unique(
@@ -197,7 +126,7 @@ async def get_github_status(clerk_user_id: str):
     }
 
 
-@app.get("/github/repositories")
+@router.get("/github/repositories")
 async def list_github_repos(clerk_user_id: str):
     """
     Fetch all repos the user has access to on GitHub.
@@ -260,7 +189,7 @@ async def list_github_repos(clerk_user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/repositories/add")
+@router.post("/repositories/add")
 async def add_repository(payload: dict = Body(...)):
     """
     Add a GitHub repo to Monomind for indexing.
@@ -314,7 +243,3 @@ async def add_repository(payload: dict = Body(...)):
         print(f"Error adding repository: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.get("/")
-async def root():
-    return {"status": "ok", "message": "Monomind API"}

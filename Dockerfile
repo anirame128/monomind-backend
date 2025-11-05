@@ -22,4 +22,4 @@ RUN prisma generate
 EXPOSE 8080
 
 # Run migrations and start app
-CMD prisma migrate deploy && uvicorn main:app --host 0.0.0.0 --port 8080
+CMD prisma migrate deploy && uvicorn src.main:app --host 0.0.0.0 --port 8080
