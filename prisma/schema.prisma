@@ -18,30 +18,43 @@ model User {
   githubUsername    String? @map("github_username")
   githubAccessToken String? @map("github_access_token")
   
-  apiKeys      ApiKey[]
-  repositories Repository[]
+  // Usage tracking (per user, not per project)
+  tier              String  @default("FREE") // FREE or PRO
+  apiRequestsUsed   Int     @default(0) @map("api_requests_used")
+  usageResetAt      DateTime @map("usage_reset_at") @default(now())
+  
+  projects     Project[]
   
   @@index([email])
   @@index([githubId])
   @@map("users")
 }
 
-model ApiKey {
-  key       String   @id
-  userId    String   @map("user_id")
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  user      User     @relation(fields: [userId], references: [clerkUserId])
+model Project {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  apiKey      String   @unique @map("api_key")
   
-  @@map("api_keys")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+  
+  user         User         @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  repositories Repository[]
+  
+  @@index([userId])
+  @@index([apiKey])
+  @@map("projects")
 }
 
 model Repository {
   id            String   @id @default(uuid())
-  userId        String   @map("user_id")
+  projectId     String   @map("project_id")
+  userId        String   @map("user_id") // For quick ownership checks
   
   // GitHub metadata
-  githubId      Int      @unique @map("github_id")
+  githubId      Int      @map("github_id")
   githubUrl     String   @map("github_url")
   fullName      String   @map("full_name")
   defaultBranch String   @default("main") @map("default_branch")
@@ -69,10 +82,11 @@ model Repository {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
   
-  user          User     @relation(fields: [userId], references: [clerkUserId], onDelete: Cascade)
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, githubId])
-  @@index([userId, status])
+  @@unique([projectId, githubId]) // Same repo can't be added twice to same project
+  @@index([projectId, status])
+  @@index([userId]) // For quick "show all my repos" queries
   @@index([webhookId])
   @@map("repositories")
 }

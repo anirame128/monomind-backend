@@ -127,10 +127,10 @@ async def get_github_status(clerk_user_id: str):
 
 
 @router.get("/github/repositories")
-async def list_github_repos(clerk_user_id: str):
+async def list_github_repos(clerk_user_id: str, project_id: str):
     """
     Fetch all repos the user has access to on GitHub.
-    Shows which are already indexed vs. available to add.
+    Shows which are already indexed in this project vs. available to add.
     """
     user = await db.user.find_unique(
         where={"clerkUserId": clerk_user_id}
@@ -160,9 +160,9 @@ async def list_github_repos(clerk_user_id: str):
             
             github_repos = response.json()
         
-        # Check which are already indexed
+        # Check which are already indexed in this project
         indexed_repos = await db.repository.find_many(
-            where={"userId": user.clerkUserId}
+            where={"projectId": project_id}
         )
         indexed_ids = {r.githubId for r in indexed_repos}
         
@@ -192,10 +192,11 @@ async def list_github_repos(clerk_user_id: str):
 @router.post("/repositories/add")
 async def add_repository(payload: dict = Body(...)):
     """
-    Add a GitHub repo to Monomind for indexing.
+    Add a GitHub repo to a project for indexing.
     For now, just creates the record. We'll add actual indexing next.
     """
     clerk_user_id = payload.get("clerk_user_id")
+    project_id = payload.get("project_id")
     github_repo_id = payload.get("github_repo_id")
     
     user = await db.user.find_unique(
@@ -204,6 +205,14 @@ async def add_repository(payload: dict = Body(...)):
     
     if not user or not user.githubAccessToken:
         raise HTTPException(status_code=400, detail="GitHub not connected")
+    
+    # Verify project belongs to user
+    project = await db.project.find_unique(
+        where={"id": project_id}
+    )
+    
+    if not project or project.userId != clerk_user_id:
+        raise HTTPException(status_code=403, detail="Project not found or access denied")
     
     try:
         # Get repo details from GitHub
@@ -224,6 +233,7 @@ async def add_repository(payload: dict = Body(...)):
         # Create repository record
         repo = await db.repository.create(
             data={
+                "projectId": project_id,
                 "userId": user.clerkUserId,
                 "githubId": github_repo["id"],
                 "githubUrl": github_repo["html_url"],
@@ -243,3 +253,18 @@ async def add_repository(payload: dict = Body(...)):
         print(f"Error adding repository: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+
+@router.get("/projects/{project_id}/repositories")
+async def list_project_repositories(project_id: str):
+    """List all repositories in a project."""
+    repos = await db.repository.find_many(
+        where={"projectId": project_id}
+    )
+    return repos
+
+
+@router.delete("/repositories/{repository_id}")
+async def delete_repository(repository_id: str):
+    """Remove a repository from a project."""
+    await db.repository.delete(where={"id": repository_id})
+    return {"status": "deleted"}

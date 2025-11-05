@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import db, CORS_ORIGINS
-from .apis import github, clerk, api_keys
+from .apis import github, clerk, projects
 
 app = FastAPI()
 
@@ -26,7 +26,7 @@ async def shutdown():
 # Include routers
 app.include_router(github.router)
 app.include_router(clerk.router)
-app.include_router(api_keys.router)
+app.include_router(projects.router)
 
 
 @app.get("/")
