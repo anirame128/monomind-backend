@@ -12,6 +12,18 @@ async def create_project(payload: dict = Body(...)):
     name = payload.get("name", "Untitled Project")
     description = payload.get("description")
     
+    # Check if user exists, create if not (webhook may not have fired yet)
+    user = await db.user.upsert(
+        where={"clerkUserId": clerk_user_id},
+        data={
+            "create": {
+                "clerkUserId": clerk_user_id,
+                "email": f"{clerk_user_id}@temp.monomind"  # Temporary, webhook will update
+            },
+            "update": {}
+        }
+    )
+    
     # Generate API key
     api_key = f"mk_proj_{secrets.token_urlsafe(32)}"
     
